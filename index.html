@@ -288,6 +288,13 @@ ins.adsbygoogle[data-ad-status="unfilled"]{display:none!important;margin:0!impor
                 <button class="btn" onclick="startGame()" style="flex:1;min-width:120px;">もう一度プレイ</button>
                 <a id="scoreShareBtn" href="#" target="_blank" rel="noopener" style="flex:1;min-width:120px;background:#1DA1F2;color:white;border:none;padding:14px 16px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">𝕏 スコアをシェア</a>
               </div>
+
+              <!-- M10: 印刷・エクスポート機能 -->
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
+                <button onclick="printResult()" style="flex:1;min-width:100px;background:#6B7280;color:white;border:none;padding:10px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px;">🖨 印刷</button>
+                <button onclick="copyResult()" style="flex:1;min-width:100px;background:#10B981;color:white;border:none;padding:10px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px;" id="copyBtn">📋 コピー</button>
+                <button onclick="downloadCSV()" style="flex:1;min-width:100px;background:#F59E0B;color:white;border:none;padding:10px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px;">📥 履歴CSV</button>
+              </div>
             </div>
           </div>
         </div>
@@ -747,6 +754,102 @@ ins.adsbygoogle[data-ad-status="unfilled"]{display:none!important;margin:0!impor
       document.getElementById('goalBar').style.width = ratio + '%';
       const text = score >= goalScore ? '✅ 目標達成！おめでとうございます！' : score + '/' + goalScore + ' （達成率: ' + ratio.toFixed(0) + '%）';
       document.getElementById('goalText').textContent = text;
+    }
+
+    // M10: 印刷機能
+    function printResult() {
+      const printWindow = window.open('', '', 'height=600,width=800');
+      const pct = score / TOTAL;
+      let rank;
+      if (pct === 1)       { rank = 'Rank: SSS'; }
+      else if (pct >= 0.8) { rank = 'Rank: S'; }
+      else if (pct >= 0.6) { rank = 'Rank: A'; }
+      else if (pct >= 0.4) { rank = 'Rank: B'; }
+      else                 { rank = 'Rank: C'; }
+
+      const printContent = `
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+          <meta charset="UTF-8">
+          <title>色彩感覚クイズゲーム - 成績表</title>
+          <style>
+            body { font-family: 'Noto Sans JP', sans-serif; padding: 40px; color: #333; }
+            .title { font-size: 28px; font-weight: bold; text-align: center; margin-bottom: 30px; }
+            .score-box { text-align: center; margin: 20px 0; }
+            .score-value { font-size: 48px; font-weight: bold; color: #7C3AED; }
+            .info { margin: 15px 0; font-size: 16px; }
+            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #888; }
+          </style>
+        </head>
+        <body>
+          <div class="title">色彩感覚クイズゲーム - 成績表</div>
+          <div class="score-box">
+            <div class="score-value">${score} / ${TOTAL}</div>
+            <div>${rank}</div>
+          </div>
+          <div class="info">難易度: ${DIFF_NAMES[difficulty]}</div>
+          <div class="info">正答率: ${((score/TOTAL)*100).toFixed(1)}%</div>
+          <div class="info">日時: ${new Date().toLocaleString('ja-JP')}</div>
+          <div class="footer">この成績表は色彩感覚クイズゲームから出力されました。<br>https://appadaycreator.com/color-sense-game/</div>
+        </body>
+        </html>
+      `;
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
+
+    // M10: 結果をクリップボードにコピー
+    function copyResult() {
+      const pct = score / TOTAL;
+      let rank;
+      if (pct === 1)       { rank = 'SSS'; }
+      else if (pct >= 0.8) { rank = 'S'; }
+      else if (pct >= 0.6) { rank = 'A'; }
+      else if (pct >= 0.4) { rank = 'B'; }
+      else                 { rank = 'C'; }
+
+      const resultText = `色彩感覚クイズゲーム - 成績
+スコア: ${score} / ${TOTAL}
+ランク: ${rank}
+正答率: ${((score/TOTAL)*100).toFixed(1)}%
+難易度: ${DIFF_NAMES[difficulty]}
+日時: ${new Date().toLocaleString('ja-JP')}
+
+https://appadaycreator.com/color-sense-game/`;
+
+      navigator.clipboard.writeText(resultText).then(() => {
+        const btn = document.getElementById('copyBtn');
+        const originalText = btn.textContent;
+        btn.textContent = '✅ コピーしました！';
+        setTimeout(() => { btn.textContent = originalText; }, 2000);
+      }).catch(() => {
+        alert('クリップボードへのコピーに失敗しました');
+      });
+    }
+
+    // M10: 履歴をCSVダウンロード
+    function downloadCSV() {
+      const history = getPlayHistory();
+      if (history.length === 0) {
+        alert('プレイ履歴がまだありません');
+        return;
+      }
+
+      let csv = '番号,スコア,難易度,日付\n';
+      history.forEach((s, i) => {
+        const date = new Date().toLocaleDateString('ja-JP'); // 簡易版：現在日時
+        csv += `${i+1},${s},${DIFF_NAMES[difficulty]},${date}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv; charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'color-sense-game-history.csv');
+      link.click();
+      URL.revokeObjectURL(url);
     }
     </script>
 
